@@ -1,90 +1,117 @@
-"""
-Preservr Data Visualizations - Followers and Following
-
-Author: Shirley Chen
-Description: This module analyzes follower and following user data and displays mutuals, users who you follow but
-don't follow you back, and users that follow you that you don't follow back.
-Input: followers_1.json, following.json
-Output: txt file with the aforementioned information saved to the 'OUTPUT_FOLDER' directory
-Date: 2025-03
-"""
-import os
 import json
-import sys
+import os
+import tkinter as tk
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-def find_file_in_subdirectories(folder_path, filename):
-    """
-    Recursively search for the specified file in subdirectories.
-    """
-    for root, dirs, files in os.walk(folder_path):
-        if filename in files:
-            return os.path.join(root, filename)
-    return None
+def load_json_from_path(file_path):
+    if not os.path.exists(file_path):
+        messagebox.showerror("Error", f"File not found: {file_path}")
+        return None
+    with open(file_path, 'r', encoding='utf-8') as file:
+        return json.load(file)
 
-def load_usernames(filepath, label):
-    """
-    Load usernames from Instagram JSON file. Supports top-level lists and nested keys.
-    """
-    usernames = []
-    try:
-        with open(filepath, "r", encoding="utf-8") as file:
-            data = json.load(file)
-
-            if isinstance(data, dict) and "relationships_following" in data:
-                data = data["relationships_following"]
-
-            for entry in data:
-                if "string_list_data" in entry and entry["string_list_data"]:
-                    username = entry["string_list_data"][0]["value"].strip()
-                    usernames.append(username)
-
-            print(f"[{label}] Loaded {len(usernames)} usernames from {filepath}")
-    except Exception as e:
-        print(f"Error loading {label}: {e}")
+def extract_usernames(json_data, data_type):
+    usernames = set()
+    if not isinstance(json_data, list):
+        return usernames
+    for entry in json_data:
+        string_list = entry.get("string_list_data", [])
+        for item in string_list:
+            value = item.get("value")
+            if value:
+                usernames.add(value)
     return usernames
 
-def analyze_follow_data(folder_path):
-    """
-    Locate files and analyze followers vs. following data.
-    Save results to OUTPUT_FOLDER.
-    """
-    followers_file = find_file_in_subdirectories(folder_path, "followers_1.json")
-    following_file = find_file_in_subdirectories(folder_path, "following.json")
+def select_base_folder():
+    folder_selected = filedialog.askdirectory(title="Select Base Folder")
+    if folder_selected:
+        global base_folder
+        base_folder = folder_selected
+        folder_label.config(text=f"📁 {base_folder}")
+    else:
+        messagebox.showerror("Error", "No folder selected.")
 
-    if not followers_file or not following_file:
-        print("Error: One or both required JSON files not found.")
+def process_files():
+    if not base_folder:
+        messagebox.showerror("Error", "Please select a base folder first.")
         return
 
-    followers = load_usernames(followers_file, "Followers")
-    following = load_usernames(following_file, "Following")
+    possible_paths = [
+        os.path.join(base_folder, "connections", "followers_and_following"),
+        os.path.join(base_folder, "followers_and_following")
+    ]
 
-    followers_set = set(followers)
-    following_set = set(following)
+    for path in possible_paths:
+        followers_file = os.path.join(path, "followers_1.json")
+        following_file = os.path.join(path, "following.json")
+        if os.path.exists(followers_file) and os.path.exists(following_file):
+            break
+    else:
+        messagebox.showerror("Error", "followers_1.json and following.json not found.")
+        return
 
-    mutuals = sorted(followers_set & following_set)
-    fans = sorted(followers_set - following_set)
-    not_following_back = sorted(following_set - followers_set)
+    followers_data = load_json_from_path(followers_file)
+    following_data = load_json_from_path(following_file)
 
-    # Create OUTPUT_FOLDER if it doesn't exist
-    output_folder = os.path.join(folder_path, "OUTPUT_FOLDER")
-    os.makedirs(output_folder, exist_ok=True)
+    if not followers_data or not following_data:
+        return
 
-    output_file = os.path.join(output_folder, "follow_analysis.txt")
+    followers_usernames = extract_usernames(followers_data, "Followers")
+    following_usernames = extract_usernames(following_data, "Following")
 
-    with open(output_file, "w", encoding="utf-8") as out:
-        out.write("Mutuals:\n")
-        out.write("\n".join(mutuals) + "\n\n")
-        out.write("People who follow me but I don’t follow back:\n")
-        out.write("\n".join(fans) + "\n\n")
-        out.write("People I follow but who don’t follow me back:\n")
-        out.write("\n".join(not_following_back))
+    not_following_back = following_usernames - followers_usernames
+    not_followed_back = followers_usernames - following_usernames
+    mutuals = followers_usernames & following_usernames
 
-    print(f"\n✅ Analysis written to {output_file}")
+    output_text.configure(state="normal")
+    output_text.delete('1.0', tk.END)
+    output_text.insert(tk.END, f"1️⃣ People You Follow Who Don't Follow Back ({len(not_following_back)}):\n{sorted(not_following_back)}\n\n")
+    output_text.insert(tk.END, f"2️⃣ People Who Follow You But You Don't Follow Back ({len(not_followed_back)}):\n{sorted(not_followed_back)}\n\n")
+    output_text.insert(tk.END, f"3️⃣ Mutual Followers ({len(mutuals)}):\n{sorted(mutuals)}\n\n")
+    output_text.configure(state="disabled")
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python followers_following.py <folder_path>")
-        sys.exit(1)
+# Tkinter GUI
+root = tk.Tk()
+root.title("📊 Instagram Mutuals Checker")
+root.configure(bg="#f4f6f7")
 
-    input_folder = sys.argv[1]
-    analyze_follow_data(input_folder)
+# Center the window
+window_width = 1000
+window_height = 800
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+x_position = int((screen_width / 2) - (window_width / 2))
+y_position = int((screen_height / 2) - (window_height / 2))
+root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+
+# 📚 Fonts and style
+style = ttk.Style()
+style.configure("TButton", font=("Helvetica", 12), padding=6)
+style.configure("TLabel", font=("Helvetica", 12), background="#f4f6f7")
+style.configure("Title.TLabel", font=("Helvetica", 20, "bold"), background="#f4f6f7")
+style.configure("TFrame", background="#f4f6f7")
+
+main_frame = ttk.Frame(root, padding=20)
+main_frame.pack(fill="both", expand=True)
+
+title_label = ttk.Label(main_frame, text="📊 Instagram Mutuals Checker", style="Title.TLabel")
+title_label.pack(pady=10)
+
+folder_button = ttk.Button(main_frame, text="📁 Select Base Folder", command=select_base_folder)
+folder_button.pack(pady=5)
+
+folder_label = ttk.Label(main_frame, text="No folder selected.", wraplength=800)
+folder_label.pack(pady=5)
+
+process_button = ttk.Button(main_frame, text="▶️ Process and Show Results", command=process_files)
+process_button.pack(pady=10)
+
+output_frame = ttk.Frame(main_frame, padding=10)
+output_frame.pack(fill="both", expand=True)
+
+output_text = scrolledtext.ScrolledText(output_frame, wrap=tk.WORD, font=("Consolas", 11), state="disabled")
+output_text.pack(fill="both", expand=True)
+
+base_folder = None
+
+root.mainloop()
