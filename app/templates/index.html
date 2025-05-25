@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>fan behaviour <3</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .pastel-pink { background-color: #f8c8dc; color: #333; transition: background-color 0.3s; }
+        .pastel-pink:hover { background-color: #f4aec9; color: #333; }
+
+        .pastel-blue { background-color: #c8e4f8; color: #333; transition: background-color 0.3s; }
+        .pastel-blue:hover { background-color: #add3f5; color: #333; }
+
+        .pastel-purple { background-color: #d8c8f8; color: #333; transition: background-color 0.3s; }
+        .pastel-purple:hover { background-color: #c6b2f4; color: #333; }
+
+        .list-group-item a { text-decoration: none; color: #333; }
+        .list-group-item a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="text-center mb-4">your instagram personal celebrities, fans, and friends <3 </h1>
+        <div class="intro">
+            <p>no because why did i post and lose followers :') IT'S LITERALLY FINE instagram does not even matter but i wanted to check if i still had fans 
+                SOOOO this was a 2 am project cause I couldn't sleep :D before you use this you need to request your own instagram data as follows: </br>
+                <ul>
+                    <li><b>prequisites:</b> </li>
+                    <ul>
+                        <li>a valid instagram account </li>
+                        <li>a device with a web browser in desktop mode</li>
+                        <li>sufficient storage space (~ 3GB depending on age of the instagram account)</li>
+                        <li>internet access</li>
+                    </ul>
+                </ul>
+                <ol>
+                    <li> log into your instagram account. </li>
+                    <li> access the download data settings by clicking on your profile, clicking on the settings gear icon and clicking on meta accounts centre</li>
+                    <li> once in the accounts centre, click on the "Your information and permissions" tab option on the left menu.  </li>
+                    <li> click on the download your information tab. then click on the "Download or transfer information button".</li>
+                    <li> select your instagram profile, and then click on the "Some of your information" button.</li>
+                    <li> scroll to the "Connections" section, and select Followers and following. click the "Next" button. </li>
+                    <li> click the "Download to device" option and change the "Date range" to "All time". change the "Format" of the files to "JSON" and click "Save".</li>
+                    <li> once you are ready to download the files, click the "Create files" button. Wait until your files have been sent to your email, and download and unzip your files for use. </li>
+                    <li> follow the instructions below and upload the files in their respective locations to analyze your files. </li>
+                </ol>
+                </br>
+                enjoy :p
+            </p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" class="bg-white p-4 rounded shadow-sm">
+            <div class="mb-3">
+                <label for="followers_file" class="form-label">Upload <strong>followers_1.json</strong></label>
+                <input type="file" class="form-control" id="followers_file" name="followers_file" accept=".json" required>
+            </div>
+            <div class="mb-3">
+                <label for="following_file" class="form-label">Upload <strong>following.json</strong></label>
+                <input type="file" class="form-control" id="following_file" name="following_file" accept=".json" required>
+            </div>
+            <button type="submit" class="btn pastel-blue w-100">Analyze</button>
+        </form>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert alert-danger mt-3">
+            {% for message in messages %}
+            <div>{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% if result %}
+        <div class="mt-5 text-start">
+            <h3>Results:</h3>
+
+            <!-- Expandable Section for Not Following Back -->
+            <button class="btn pastel-pink w-100 mb-2 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNotFollowingBack" aria-expanded="false">
+                👸 celebrities (u follow but they don't follow back) ({{ result.not_following_back|length }})
+            </button>
+            <div class="collapse" id="collapseNotFollowingBack">
+                <div class="card card-body">
+                    <ul class="list-group">
+                        {% for user in result.not_following_back %}
+                        <li class="list-group-item text-start">
+                            <a href="https://www.instagram.com/{{ user }}" target="_blank">{{ user }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Expandable Section for Not Followed Back -->
+            <button class="btn pastel-blue w-100 mb-2 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNotFollowedBack" aria-expanded="false">
+                🪭 fans (they follow u but u don't follow back) ({{ result.not_followed_back|length }})
+            </button>
+            <div class="collapse" id="collapseNotFollowedBack">
+                <div class="card card-body">
+                    <ul class="list-group">
+                        {% for user in result.not_followed_back %}
+                        <li class="list-group-item text-start">
+                            <a href="https://www.instagram.com/{{ user }}" target="_blank">{{ user }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Expandable Section for Mutuals -->
+            <button class="btn pastel-purple w-100 mb-2 text-start" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMutuals" aria-expanded="false">
+                👥 friends (mutuals) ({{ result.mutuals|length }})
+            </button>
+            <div class="collapse" id="collapseMutuals">
+                <div class="card card-body">
+                    <ul class="list-group">
+                        {% for user in result.mutuals %}
+                        <li class="list-group-item text-start">
+                            <a href="https://www.instagram.com/{{ user }}" target="_blank">{{ user }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap JS Bundle (includes Popper.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
