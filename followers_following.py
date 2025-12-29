@@ -14,77 +14,65 @@ def load_json_from_path(file_path):
         messagebox.showerror("Error", f"Failed to load {file_path}: {str(e)}")
         return None
 
-def extract_usernames(json_data, file_type="followers"):
+def extract_followers_usernames(json_data):
+    """Extract usernames from followers_1.json"""
     usernames = set()
     
     if not json_data:
         return usernames
     
-    # Debug: Print the structure
-    print(f"\n=== {file_type.upper()} DATA STRUCTURE ===")
+    print(f"\n=== FOLLOWERS DATA STRUCTURE ===")
+    print(f"Type: {type(json_data)}")
+    if isinstance(json_data, list):
+        print(f"List length: {len(json_data)}")
+        if json_data:
+            print(f"First item keys: {list(json_data[0].keys())}")
+    
+    # New Instagram format for followers_1.json
+    if isinstance(json_data, list):
+        for item in json_data:
+            if isinstance(item, dict):
+                # Look for string_list_data
+                if "string_list_data" in item and isinstance(item["string_list_data"], list):
+                    for string_item in item["string_list_data"]:
+                        if isinstance(string_item, dict) and "value" in string_item:
+                            usernames.add(string_item["value"])
+                            print(f"Added follower: {string_item['value']}")
+    
+    print(f"Extracted {len(usernames)} usernames from followers")
+    return usernames
+
+def extract_following_usernames(json_data):
+    """Extract usernames from following.json"""
+    usernames = set()
+    
+    if not json_data:
+        return usernames
+    
+    print(f"\n=== FOLLOWING DATA STRUCTURE ===")
     print(f"Type: {type(json_data)}")
     if isinstance(json_data, dict):
         print(f"Keys: {list(json_data.keys())}")
-    elif isinstance(json_data, list):
-        print(f"List length: {len(json_data)}")
     
-    # Try different possible structures
-    usernames = try_all_formats(json_data)
-    
-    print(f"Extracted {len(usernames)} usernames from {file_type}")
-    return usernames
-
-def try_all_formats(data):
-    """Try multiple possible JSON structures to extract usernames"""
-    usernames = set()
-    
-    # Structure 1: New Instagram format
-    if isinstance(data, dict):
-        # Try to find any list that might contain user data
-        for key, value in data.items():
-            if isinstance(value, list):
-                for item in value:
-                    usernames.update(extract_from_item(item))
-    
-    # Structure 2: Direct list
-    elif isinstance(data, list):
-        for item in data:
-            usernames.update(extract_from_item(item))
-    
-    return usernames
-
-def extract_from_item(item):
-    """Extract username from any item structure"""
-    usernames = set()
-    
-    if isinstance(item, dict):
-        # Try different possible keys for username
-        possible_keys = ['value', 'username', 'string_list_data', 'title', 'name']
+    # New Instagram format for following.json
+    if isinstance(json_data, dict):
+        # Check for relationships_following key
+        if "relationships_following" in json_data and isinstance(json_data["relationships_following"], list):
+            for item in json_data["relationships_following"]:
+                if isinstance(item, dict):
+                    # Username is in the "title" field for following.json
+                    if "title" in item and item["title"]:
+                        usernames.add(item["title"])
+                        print(f"Added following: {item['title']}")
         
-        for key in possible_keys:
-            if key in item:
-                value = item[key]
-                
-                if isinstance(value, str):
-                    usernames.add(value)
-                elif isinstance(value, list):
-                    for subitem in value:
-                        if isinstance(subitem, dict):
-                            usernames.update(extract_from_item(subitem))
-                elif isinstance(value, dict):
-                    usernames.update(extract_from_item(value))
-        
-        # Also check for nested structures
-        for key, value in item.items():
-            if key not in possible_keys and isinstance(value, dict):
-                usernames.update(extract_from_item(value))
-            elif key not in possible_keys and isinstance(value, list):
-                for subitem in value:
-                    usernames.update(extract_from_item(subitem))
+        # Alternative structure check
+        elif "following" in json_data and isinstance(json_data["following"], list):
+            for item in json_data["following"]:
+                if isinstance(item, dict) and "title" in item:
+                    usernames.add(item["title"])
+                    print(f"Added following (alternative): {item['title']}")
     
-    elif isinstance(item, str):
-        usernames.add(item)
-    
+    print(f"Extracted {len(usernames)} usernames from following")
     return usernames
 
 def select_base_folder():
@@ -140,7 +128,10 @@ def analyze_file_structure(data, file_type):
             for key, value in obj.items():
                 print("  " * indent + f"{key}: {type(value).__name__}")
                 if isinstance(value, (dict, list)) and current_depth < max_depth - 1:
-                    print_structure(value, indent + 1, max_depth, current_depth + 1)
+                    if isinstance(value, list) and value:
+                        print_structure(value[0], indent + 1, max_depth, current_depth + 1)
+                    else:
+                        print_structure(value, indent + 1, max_depth, current_depth + 1)
         elif isinstance(obj, list):
             print("  " * indent + f"List with {len(obj)} items")
             if obj and current_depth < max_depth - 1:
@@ -187,8 +178,8 @@ def process_files():
     if not followers_data or not following_data:
         return
     
-    followers_usernames = extract_usernames(followers_data, "followers")
-    following_usernames = extract_usernames(following_data, "following")
+    followers_usernames = extract_followers_usernames(followers_data)
+    following_usernames = extract_following_usernames(following_data)
     
     print(f"\nFinal counts:")
     print(f"Followers found: {len(followers_usernames)}")
@@ -202,42 +193,66 @@ def process_files():
     output_text.delete('1.0', tk.END)
     
     # Display results
-    output_text.insert(tk.END, f"📊 ANALYSIS RESULTS\n")
-    output_text.insert(tk.END, f"{'='*50}\n\n")
+    output_text.insert(tk.END, f"📊 INSTAGRAM FOLLOWERS ANALYSIS\n")
+    output_text.insert(tk.END, f"{'='*60}\n\n")
     
-    output_text.insert(tk.END, f"1️⃣ People You Follow Who Don't Follow Back ({len(not_following_back)}):\n")
-    if not_following_back:
-        output_text.insert(tk.END, f"{sorted(not_following_back)[:50]}\n")  # Show first 50
-        if len(not_following_back) > 50:
-            output_text.insert(tk.END, f"... and {len(not_following_back) - 50} more\n")
-    output_text.insert(tk.END, f"\n{'─'*50}\n\n")
+    output_text.insert(tk.END, f"🔍 FILES LOADED:\n")
+    output_text.insert(tk.END, f"• Followers: {os.path.basename(followers_file)}\n")
+    output_text.insert(tk.END, f"• Following: {os.path.basename(following_file)}\n\n")
     
-    output_text.insert(tk.END, f"2️⃣ People Who Follow You But You Don't Follow Back ({len(not_followed_back)}):\n")
-    if not_followed_back:
-        output_text.insert(tk.END, f"{sorted(not_followed_back)[:50]}\n")  # Show first 50
-        if len(not_followed_back) > 50:
-            output_text.insert(tk.END, f"... and {len(not_followed_back) - 50} more\n")
-    output_text.insert(tk.END, f"\n{'─'*50}\n\n")
-    
-    output_text.insert(tk.END, f"3️⃣ Mutual Followers ({len(mutuals)}):\n")
-    if mutuals:
-        output_text.insert(tk.END, f"{sorted(mutuals)[:50]}\n")  # Show first 50
-        if len(mutuals) > 50:
-            output_text.insert(tk.END, f"... and {len(mutuals) - 50} more\n")
-    
-    output_text.insert(tk.END, f"\n{'='*50}\n")
-    output_text.insert(tk.END, f"📈 SUMMARY\n")
+    output_text.insert(tk.END, f"📈 SUMMARY STATISTICS:\n")
     output_text.insert(tk.END, f"• Your followers: {len(followers_usernames)}\n")
     output_text.insert(tk.END, f"• You follow: {len(following_usernames)}\n")
-    output_text.insert(tk.END, f"• Not following you back: {len(not_following_back)}\n")
-    output_text.insert(tk.END, f"• You don't follow back: {len(not_followed_back)}\n")
     output_text.insert(tk.END, f"• Mutual followers: {len(mutuals)}\n")
+    output_text.insert(tk.END, f"• Not following you back: {len(not_following_back)}\n")
+    output_text.insert(tk.END, f"• You don't follow back: {len(not_followed_back)}\n\n")
+    
+    output_text.insert(tk.END, f"{'='*60}\n\n")
+    
+    output_text.insert(tk.END, f"1️⃣ PEOPLE YOU FOLLOW WHO DON'T FOLLOW BACK ({len(not_following_back)}):\n")
+    output_text.insert(tk.END, f"{'─'*60}\n")
+    if not_following_back:
+        sorted_list = sorted(not_following_back)
+        for i, username in enumerate(sorted_list[:50], 1):
+            output_text.insert(tk.END, f"{i:3}. @{username}\n")
+        if len(not_following_back) > 50:
+            output_text.insert(tk.END, f"\n... and {len(not_following_back) - 50} more\n")
+    else:
+        output_text.insert(tk.END, "🎉 No one! Everyone you follow follows you back.\n")
+    output_text.insert(tk.END, f"\n{'='*60}\n\n")
+    
+    output_text.insert(tk.END, f"2️⃣ PEOPLE WHO FOLLOW YOU BUT YOU DON'T FOLLOW BACK ({len(not_followed_back)}):\n")
+    output_text.insert(tk.END, f"{'─'*60}\n")
+    if not_followed_back:
+        sorted_list = sorted(not_followed_back)
+        for i, username in enumerate(sorted_list[:50], 1):
+            output_text.insert(tk.END, f"{i:3}. @{username}\n")
+        if len(not_followed_back) > 50:
+            output_text.insert(tk.END, f"\n... and {len(not_followed_back) - 50} more\n")
+    else:
+        output_text.insert(tk.END, "✅ You follow back all your followers!\n")
+    output_text.insert(tk.END, f"\n{'='*60}\n\n")
+    
+    output_text.insert(tk.END, f"3️⃣ MUTUAL FOLLOWERS ({len(mutuals)}):\n")
+    output_text.insert(tk.END, f"{'─'*60}\n")
+    if mutuals:
+        sorted_list = sorted(mutuals)
+        for i, username in enumerate(sorted_list[:50], 1):
+            output_text.insert(tk.END, f"{i:3}. @{username}\n")
+        if len(mutuals) > 50:
+            output_text.insert(tk.END, f"\n... and {len(mutuals) - 50} more\n")
+    else:
+        output_text.insert(tk.END, "No mutual followers found.\n")
+    
+    output_text.insert(tk.END, f"\n{'='*60}\n")
+    output_text.insert(tk.END, f"✅ Analysis completed successfully!\n")
+    output_text.insert(tk.END, f"Generated: {len(following_usernames) - len(mutuals)} unfollow suggestions\n")
     
     output_text.configure(state="disabled")
 
 # Tkinter GUI
 root = tk.Tk()
-root.title("📊 Instagram Mutuals Checker (Updated)")
+root.title("📊 Instagram Mutuals Checker (Updated for New Format)")
 root.configure(bg="#f4f6f7")
 
 # Center the window
@@ -259,16 +274,16 @@ style.configure("TFrame", background="#f4f6f7")
 main_frame = ttk.Frame(root, padding=20)
 main_frame.pack(fill="both", expand=True)
 
-title_label = ttk.Label(main_frame, text="📊 Instagram Mutuals Checker (Updated)", style="Title.TLabel")
+title_label = ttk.Label(main_frame, text="📊 Instagram Mutuals Checker (New Format)", style="Title.TLabel")
 title_label.pack(pady=10)
 
 instructions = ttk.Label(main_frame, 
-    text="Select the folder containing your Instagram data export (should contain followers and following JSON files)",
+    text="Select the folder containing your Instagram data export. Instagram's new format stores:\n• followers_1.json (contains your followers)\n• following.json (contains people you follow)",
     wraplength=800,
     justify="center")
 instructions.pack(pady=5)
 
-folder_button = ttk.Button(main_frame, text="📁 Select Base Folder", command=select_base_folder)
+folder_button = ttk.Button(main_frame, text="📁 Select Instagram Data Folder", command=select_base_folder)
 folder_button.pack(pady=5)
 
 folder_label = ttk.Label(main_frame, text="No folder selected.", wraplength=800)
