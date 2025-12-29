@@ -10,17 +10,24 @@ def load_json_from_path(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         return json.load(file)
 
-def extract_usernames(json_data, data_type):
+def extract_usernames(json_data):
     usernames = set()
+
+    # Handle following.json structure
+    if isinstance(json_data, dict):
+        json_data = json_data.get("relationships_following", [])
+
     if not isinstance(json_data, list):
         return usernames
+
     for entry in json_data:
-        string_list = entry.get("string_list_data", [])
-        for item in string_list:
+        for item in entry.get("string_list_data", []):
             value = item.get("value")
             if value:
                 usernames.add(value)
+
     return usernames
+
 
 def select_base_folder():
     folder_selected = filedialog.askdirectory(title="Select Base Folder")
@@ -56,8 +63,8 @@ def process_files():
     if not followers_data or not following_data:
         return
 
-    followers_usernames = extract_usernames(followers_data, "Followers")
-    following_usernames = extract_usernames(following_data, "Following")
+    followers_usernames = extract_usernames(followers_data)
+    following_usernames = extract_usernames(following_data)
 
     not_following_back = following_usernames - followers_usernames
     not_followed_back = followers_usernames - following_usernames
